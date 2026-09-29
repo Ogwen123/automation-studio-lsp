@@ -1,0 +1,7 @@
+[package]
+name = "automation-studio-lsp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tower-lsp = "0.20.0"
