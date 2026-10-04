@@ -1,44 +1,38 @@
-use std::cell::RefCell;
 use std::fs::read_dir;
 use std::io::{Error, ErrorKind, Result};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use crate::Backend;
+use crate::{Backend, Scope};
+use crate::types::{Type, Variable};
 
 #[derive(Clone)]
-struct Scope {
-    scope: String,
-    vars: Vec<String>,
-    types: Vec<String>,
-    children: Vec<RefCell<Scope>>,
+struct ScopeData {
+    scope: Scope,
+    vars: Vec<Variable>,
+    types: Vec<Type>,
 }
 
-impl Scope {
-    fn new(scope: String) -> Self {
+impl ScopeData {
+    fn new(scope: &Path) -> Self {
         Self {
-            scope,
+            scope: Box::from(scope),
             vars: vec![],
             types: vec![],
-            children: vec![],
         }
     }
 }
 
-fn map_project(path: &Path, scope: &RefCell<Scope>) -> Result<()> {
+fn map_project(path: &Path, scopes: &mut Vec<ScopeData>) -> Result<()> {
     if !path.is_dir() {
         return Ok(());
     }
-
+    let mut cur_scope: ScopeData = ScopeData::new(path);
     for item_res in read_dir(path)? {
         let item = item_res?;
         let item_path = item.path();
 
         if item_path.is_dir() {
-            let child = RefCell::new(Scope::new(item_path.to_string_lossy().into_owned()));
-
-            map_project(&item_path, &child)?;
-
-            scope.borrow_mut().children.push(child);
+            map_project(&item_path, scopes)?;
         } else {
             let file_str = match item.file_name().into_string() {
                 Ok(s) => s,
@@ -51,32 +45,31 @@ fn map_project(path: &Path, scope: &RefCell<Scope>) -> Result<()> {
             };
 
             if file_str.ends_with(".typ") {
-                scope.borrow_mut().types.push(parse_typ())
+                println!("found {:?}", item_path);
+                cur_scope.types.append(&mut parse_typ());
             }
             if file_str.ends_with(".var") {
-                scope.borrow_mut().types.push(parse_var())
+                println!("found {:?}", item_path);
+                cur_scope.vars.append(&mut parse_var())
             }
         }
     }
+    scopes.push(cur_scope);
+    Ok(())
+}
+
+pub fn parse(path: PathBuf, backend: &mut Backend) -> Result<()> {
+    let mut scopes: Vec<ScopeData> = Vec::with_capacity(512);
+
+    map_project(path.as_path(), &mut scopes)?;
 
     Ok(())
 }
 
-pub fn parse(path: String, backend: &mut Backend) {
-    let mut top_scope = Scope {
-        scope: String::from("/"),
-        vars: vec![],
-        types: vec![],
-        children: vec![],
-    };
-
-    map_project(&Path::new(&path.as_str()), &RefCell::new(top_scope));
+fn parse_typ() -> Vec<Type> {
+    vec![]
 }
 
-fn parse_typ() -> String {
-    String::new()
-}
-
-fn parse_var() -> String {
-    String::new()
+fn parse_var() -> Vec<Variable> {
+    vec![]
 }
