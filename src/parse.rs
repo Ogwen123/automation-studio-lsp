@@ -2,37 +2,37 @@ use std::fs::read_dir;
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
 
-use crate::{Backend, Scope};
+use crate::{Backend};
 use crate::types::{Type, Variable};
 
 #[derive(Clone)]
-struct ScopeData {
-    scope: Scope,
-    vars: Vec<Variable>,
-    types: Vec<Type>,
+pub struct ScopeData {
+    pub scope: PathBuf,
+    pub vars: Vec<Variable>,
+    pub types: Vec<Type>,
 }
 
 impl ScopeData {
-    fn new(scope: &Path) -> Self {
+    fn new(scope: PathBuf) -> Self {
         Self {
-            scope: Box::from(scope),
+            scope,
             vars: vec![],
             types: vec![],
         }
     }
 }
 
-fn map_project(path: &Path, scopes: &mut Vec<ScopeData>) -> Result<()> {
+fn map_project(path: PathBuf, scopes: &mut Vec<ScopeData>) -> Result<()> {
     if !path.is_dir() {
         return Ok(());
     }
-    let mut cur_scope: ScopeData = ScopeData::new(path);
+    let mut cur_scope: ScopeData = ScopeData::new(path.clone());
     for item_res in read_dir(path)? {
         let item = item_res?;
         let item_path = item.path();
 
         if item_path.is_dir() {
-            map_project(&item_path, scopes)?;
+            map_project(item_path, scopes)?;
         } else {
             let file_str = match item.file_name().into_string() {
                 Ok(s) => s,
@@ -58,12 +58,12 @@ fn map_project(path: &Path, scopes: &mut Vec<ScopeData>) -> Result<()> {
     Ok(())
 }
 
-pub fn parse(path: PathBuf, backend: &mut Backend) -> Result<()> {
+pub fn parse(path: PathBuf) -> Result<Vec<ScopeData>> {
     let mut scopes: Vec<ScopeData> = Vec::with_capacity(512);
 
-    map_project(path.as_path(), &mut scopes)?;
+    map_project(path, &mut scopes)?;
 
-    Ok(())
+    Ok(scopes)
 }
 
 fn parse_typ() -> Vec<Type> {

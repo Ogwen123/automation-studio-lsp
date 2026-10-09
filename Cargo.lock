@@ -89,6 +89,7 @@ version = "0.1.0"
 dependencies = [
  "dashmap 6.2.1",
  "env_logger",
+ "serde_json",
  "tokio",
  "tower-lsp",
 ]
