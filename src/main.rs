@@ -16,6 +16,8 @@ use tower_lsp::lsp_types::{
     ServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server};
+use std::io::{stdout, Write};
+use log::info;
 
 struct Backend {
     client: Client,
@@ -27,6 +29,7 @@ struct Backend {
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
+        eprintln!("initing");
         let root = match params.root_uri {
             Some(uri) => match uri.to_file_path() {
                 Ok(path) => path,
@@ -98,9 +101,10 @@ impl LanguageServer for Backend {
 impl Backend {
     // Walk the project to discover new files and parse them
     async fn index(&self) {
+        eprintln!("indexing");
         let scopes = match parse(PathBuf::from("./test_code")) {
             Ok(res) => res,
-            Err(err) => panic!("Could not parse .typ and .var files ({})", err.to_string()),
+            Err(err) => panic!("Failed to parse files. ({})", err.to_string()),
         };
 
         for scope in scopes {
@@ -133,6 +137,8 @@ async fn main() {
         types: DashMap::new(),
     })
     .finish();
+
+    service.inner().index().await; // REMOVE
 
     Server::new(stdin, stdout, socket).serve(service).await;
 }

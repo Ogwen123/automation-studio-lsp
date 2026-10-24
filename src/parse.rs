@@ -1,8 +1,9 @@
+use std::fs;
 use std::fs::read_dir;
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
 
-use crate::{Backend};
+use crate::Backend;
 use crate::types::{Type, Variable};
 
 #[derive(Clone)]
@@ -20,6 +21,29 @@ impl ScopeData {
             types: vec![],
         }
     }
+}
+
+fn get_str_data(item_path: PathBuf) -> Result<String> {
+    let data = fs::read(item_path)?;
+    
+    // TODO: add support for windows-1252
+    let str_data = match String::from_utf8(data) {
+        Ok(res) => res,
+        Err(err) => {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                format!("Could not parse file content into a String. ({})", err),
+            ));
+        }
+    };
+
+    Ok(str_data)
+}
+
+fn bufcmp<T>(buf: &[char], other: T) -> bool where T: ToString {
+    let s = other.to_string();
+
+    buf.iter().copied().eq(s.chars())
 }
 
 fn map_project(path: PathBuf, scopes: &mut Vec<ScopeData>) -> Result<()> {
@@ -46,11 +70,10 @@ fn map_project(path: PathBuf, scopes: &mut Vec<ScopeData>) -> Result<()> {
 
             if file_str.ends_with(".typ") {
                 println!("found {:?}", item_path);
-                cur_scope.types.append(&mut parse_typ());
-            }
-            if file_str.ends_with(".var") {
+                cur_scope.types.append(&mut parse_typ(get_str_data(item_path)?));
+            } else if file_str.ends_with(".var") {
                 println!("found {:?}", item_path);
-                cur_scope.vars.append(&mut parse_var())
+                cur_scope.vars.append(&mut parse_var(get_str_data(item_path)?))
             }
         }
     }
@@ -66,10 +89,32 @@ pub fn parse(path: PathBuf) -> Result<Vec<ScopeData>> {
     Ok(scopes)
 }
 
-fn parse_typ() -> Vec<Type> {
+fn parse_typ(content: String) -> Vec<Type> {
+    let mut entered_type_defs: bool = false;
+    let mut in_type_def: bool = false;
+
+    let mut buf: Vec<char> = Vec::new();
+    for char in content.chars() {
+        if char == ' ' || char == '\n' { buf.clear() }
+
+        buf.push(char);
+
+        if !entered_type_defs {
+            if bufcmp(&buf, "TYPE") {
+                println!("entering type");
+                entered_type_defs = true;
+            }
+        } else {
+            if bufcmp(&buf, "END_TYPE") {
+                println!("exiting type");
+                break;
+            }
+        }
+    }
+
     vec![]
 }
 
-fn parse_var() -> Vec<Variable> {
+fn parse_var(file: String) -> Vec<Variable> {
     vec![]
 }
